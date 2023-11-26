@@ -38,7 +38,7 @@ static int do_rw(FILE* fd, int is_read, size_t size, off_t offset)
         fprintf(stderr, "failed to allocated %zu bytes\n", size);
         return -1;
     }
-    if (is_read)
+    if (is_read) // for read cmd
     {
         printf("dut do read size %ld, off %d\n", size, (int)offset);
         fseek( fd, offset, SEEK_SET );
@@ -49,7 +49,7 @@ static int do_rw(FILE* fd, int is_read, size_t size, off_t offset)
             printf("\n");	
         }
     }
-    else
+    else // for write cmd
     {
         for ( idx = 0; idx < size; idx++)
         {
