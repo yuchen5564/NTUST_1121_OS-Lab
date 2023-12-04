@@ -162,6 +162,15 @@ static int nand_erase(int block)
 
 
 // 2023/12/04 Add By yuchen
+
+
+static unsigned int gc();
+static int ftl_read();
+
+int reserve_nand = PHYSICAL_NAND_NUM - 1; // default reserve last nand for GC use
+int info_table[PHYSICAL_NAND_NUM][NAND_SIZE_KB * (1024 / 512)] = {[0 ...(PHYSICAL_NAND_NUM - 1)] = {[0 ...(NAND_SIZE_KB * (1024 / 512)) - 1] = -1}};
+int free_block_list[PHYSICAL_NAND_NUM] = {0};
+
 static void print_info_table()
 {
     printf(">>> Status in info_table: \n");
@@ -174,13 +183,6 @@ static void print_info_table()
         printf("\n");
     }
 }
-
-static unsigned int gc();
-static int ftl_read();
-
-int reserve_nand = PHYSICAL_NAND_NUM - 1; // default reserve last nand for GC use
-int info_table[PHYSICAL_NAND_NUM][NAND_SIZE_KB * (1024 / 512)] = {[0 ...(PHYSICAL_NAND_NUM - 1)] = {[0 ...(NAND_SIZE_KB * (1024 / 512)) - 1] = -1}};
-int free_block_list[PHYSICAL_NAND_NUM] = {0};
 
 // 2023/11/26 By jovi
 static unsigned int get_next_pca()
