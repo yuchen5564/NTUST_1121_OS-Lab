@@ -38,6 +38,13 @@ union pca_rule
     } fields;
 };
 
+enum
+{
+    DIRTY = -1,
+    CLEAR = 0,
+    INUSE = 1
+};
+
 PCA_RULE curr_pca;
 
 unsigned int *L2P;
@@ -147,9 +154,26 @@ static int nand_erase(int block)
     return 1;
 }
 
+int reserve_nand = PHYSICAL_NAND_NUM - 1; // defult reserve last nand for GC use
+int info_table[PHYSICAL_NAND_NUM][NAND_SIZE_KB * (1024 / 512)] = {{CLEAR}};
+
+static void print_info_table()
+{
+    printf(">>> Status in info_table: \n");
+    for (int i = 0; i < PHYSICAL_NAND_NUM; i++)
+    {
+        for (int j = 0; j < NAND_SIZE_KB * (1024 / 512); j++)
+        {
+            printf("%d ", info_table[i][j]);
+        }
+        printf("\n");
+    }
+}
+
 // 2023/11/26 By jovi
 static unsigned int get_next_pca()
 {
+
     if (curr_pca.pca == INVALID_PCA)
     {
         // init
@@ -166,6 +190,10 @@ static unsigned int get_next_pca()
     if (curr_pca.fields.page == NAND_SIZE_KB * (1024 / 512) - 1)
     {
         curr_pca.fields.block += 1;
+        if (curr_pca.fields.block == reserve_nand)
+        {
+            curr_pca.fields.block += 1;
+        }
     }
     curr_pca.fields.page = (curr_pca.fields.page + 1) % (NAND_SIZE_KB * (1024 / 512));
     if (curr_pca.fields.block >= PHYSICAL_NAND_NUM)
@@ -202,11 +230,21 @@ static int ftl_write(const char *buf, size_t lba_rnage, size_t lba)
     /*  TODO: only basic write case, need to consider other cases */
 
     PCA_RULE pca;
+    // printf(">>>>> L2P[lba]: %d\n", L2P[lba]);
+    if (L2P[lba] != -1)
+    {
+        pca.pca = L2P[lba];
+        info_table[pca.fields.block][pca.fields.page] = DIRTY;
+    }
+
     pca.pca = get_next_pca();
+    // create a record for info_table
 
     if (nand_write(buf, pca.pca) > 0)
     {
         L2P[lba] = pca.pca;
+        info_table[pca.fields.block][pca.fields.page] = INUSE;
+        print_info_table();
         return 512;
     }
     else
@@ -391,7 +429,6 @@ static int ssd_do_write(const char *buf, size_t size, off_t offset)
                 memcpy(alignBuf + offset_in_lba, buf, 512 - offset_in_lba);
                 rst = ftl_write(alignBuf, 1, tmp_lba + idx);
             }
-            
 
             if (rst == 0)
             {
