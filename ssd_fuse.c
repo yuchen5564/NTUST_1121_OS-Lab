@@ -159,8 +159,7 @@ static int nand_erase(int block)
     return 1;
 }
 
-int reserve_nand = PHYSICAL_NAND_NUM - 1; // default reserve last nand for GC use
-int info_table[PHYSICAL_NAND_NUM][NAND_SIZE_KB * (1024 / 512)] = {[0 ...(PHYSICAL_NAND_NUM - 1)] = {[0 ...(NAND_SIZE_KB * (1024 / 512)) - 1] = -1}};
+
 
 // 2023/12/04 Add By yuchen
 static void print_info_table()
@@ -177,7 +176,10 @@ static void print_info_table()
 }
 
 static unsigned int gc();
+static int ftl_read();
 
+int reserve_nand = PHYSICAL_NAND_NUM - 1; // default reserve last nand for GC use
+int info_table[PHYSICAL_NAND_NUM][NAND_SIZE_KB * (1024 / 512)] = {[0 ...(PHYSICAL_NAND_NUM - 1)] = {[0 ...(NAND_SIZE_KB * (1024 / 512)) - 1] = -1}};
 int free_block_list[PHYSICAL_NAND_NUM] = {0};
 
 // 2023/11/26 By jovi
@@ -227,6 +229,57 @@ static unsigned int get_next_pca()
     }
 }
 
+static unsigned int gc()
+{
+    int invaild_page_num[PHYSICAL_NAND_NUM] = {0};
+    int max_invaild_nand = -1;
+
+    PCA_RULE pca;
+    pca.fields.block = reserve_nand;
+    pca.fields.page = 0;
+
+    // int already_do_gc[PHYSICAL_NAND_NUM] = {0};
+    // already_do_gc[reserve_nand] = 1;
+
+    for (int i = 0; i < PHYSICAL_NAND_NUM; i++)
+    {
+        if (free_block_list[i] != -1)
+            continue;
+
+        for (int j = 0; j < NAND_SIZE_KB * (1024 / 512); j++)
+        {
+            if (info_table[i][j] != DIRTY)
+            {
+                char buf[512] = {'\0'};
+                ftl_read(buf, info_table[i][j]);
+                nand_write(buf, pca.pca);
+                L2P[info_table[i][j]] = pca.pca;
+                info_table[reserve_nand][pca.fields.page] = info_table[i][j];
+                pca.fields.page++;
+
+                if (pca.fields.page >= (NAND_SIZE_KB * (1024 / 512)))
+                {
+                    reserve_nand = i;
+                    pca.fields.block = i;
+                    pca.fields.page = 0;
+                }
+            }
+            info_table[i][j] = CLEAR;
+        }
+        nand_erase(i);
+        free_block_list[i] = 0;
+    }
+
+    for (int i = 0; i < PHYSICAL_NAND_NUM; i++)
+    {
+        if (info_table[i][0] == CLEAR)
+            reserve_nand = i;
+    }
+    printf(">>>>> reserve_nand: %d\n", reserve_nand);
+    print_info_table();
+    return pca.pca;
+}
+
 static int ftl_read(char *buf, size_t lba)
 {
     PCA_RULE pca;
@@ -241,54 +294,6 @@ static int ftl_read(char *buf, size_t lba)
     {
         return nand_read(buf, pca.pca);
     }
-}
-
-static unsigned int gc()
-{
-    int invaild_page_num[PHYSICAL_NAND_NUM] = {0};
-    int max_invaild_nand = -1;
-
-    // get most invaild page nand, and select it to do gc
-    for (int i = 0; i < PHYSICAL_NAND_NUM; i++)
-    {
-        for (int j = 0; j < NAND_SIZE_KB * (1024 / 512); j++)
-        {
-            if (info_table[i][j] == DIRTY)
-                invaild_page_num[i]++;
-        }
-        if (max_invaild_nand == -1)
-            max_invaild_nand = i;
-        else if (invaild_page_num[max_invaild_nand] < invaild_page_num[i])
-            max_invaild_nand = i;
-    }
-    printf(">>> max_invaild_nand: %d\n", max_invaild_nand);
-    free_block_list[max_invaild_nand] = 0;
-
-    if (max_invaild_nand == -1)
-        return FULL_PCA;
-
-    PCA_RULE pca;
-    pca.fields.block = reserve_nand;
-    pca.fields.page = 0;
-    for (int i = 0; i < NAND_SIZE_KB * (1024 / 512); i++)
-    {
-        if (info_table[max_invaild_nand][i] != DIRTY && info_table[max_invaild_nand][i] != CLEAR)
-        {
-            char buf[512] = {'\0'};
-            ftl_read(buf, info_table[max_invaild_nand][i]);
-            nand_write(buf, pca.pca);
-            L2P[info_table[max_invaild_nand][i]] = pca.pca;
-            info_table[reserve_nand][pca.fields.page] = info_table[max_invaild_nand][i];
-            pca.fields.page++;
-        }
-        info_table[max_invaild_nand][i] = CLEAR;
-    }
-    printf(">>> max_invaild_nand: %d\n", max_invaild_nand);
-    nand_erase(max_invaild_nand);
-    reserve_nand = max_invaild_nand;
-    print_info_table();
-
-    return pca.pca;
 }
 
 static int ftl_write(const char *buf, size_t lba_rnage, size_t lba)
