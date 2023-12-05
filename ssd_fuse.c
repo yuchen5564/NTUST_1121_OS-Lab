@@ -159,10 +159,7 @@ static int nand_erase(int block)
     return 1;
 }
 
-
-
 // 2023/12/04 Add By yuchen
-
 
 static unsigned int gc();
 static int ftl_read();
@@ -178,7 +175,7 @@ static void print_info_table()
     {
         for (int j = 0; j < NAND_SIZE_KB * (1024 / 512); j++)
         {
-            printf("%d ", info_table[i][j]);
+            printf("%2d ", info_table[i][j]);
         }
         printf("\n");
     }
@@ -233,8 +230,24 @@ static unsigned int get_next_pca()
 
 static unsigned int gc()
 {
-    int invaild_page_num[PHYSICAL_NAND_NUM] = {0};
-    int max_invaild_nand = -1;
+    int invaild_page_num[PHYSICAL_NAND_NUM] = {[0 ... PHYSICAL_NAND_NUM - 1] = 0};
+    // int max_invaild_nand = -1;
+    for (int i = 0; i < PHYSICAL_NAND_NUM; i++)
+    {
+        for (int j = 0; j < NAND_SIZE_KB * (1024 / 512); j++)
+        {
+            if (info_table[i][j] == DIRTY)
+            {
+                invaild_page_num[i]++;
+            }
+        }
+    }
+
+    printf(">>>>> invaild_page_num: ");
+    for(int i = 0;i<PHYSICAL_NAND_NUM;i++){
+        printf("%2d ", invaild_page_num[i]);
+    }
+    printf("\n");
 
     PCA_RULE pca;
     pca.fields.block = reserve_nand;
@@ -247,6 +260,12 @@ static unsigned int gc()
     {
         if (free_block_list[i] != -1)
             continue;
+        printf("%f\n",invaild_page_num[i] * 1.0 /(NAND_SIZE_KB * (1024 / 512)));
+        if(invaild_page_num[i] * 1.0 /(NAND_SIZE_KB * (1024 / 512)) < 0.25){
+            
+            continue;
+        }
+            
 
         for (int j = 0; j < NAND_SIZE_KB * (1024 / 512); j++)
         {
