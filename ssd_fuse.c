@@ -259,6 +259,7 @@ static unsigned int gc()
 
     // int already_do_gc[PHYSICAL_NAND_NUM] = {0};
     // already_do_gc[reserve_nand] = 1;
+    int pre_clear_block = 0;
 
     for (int i = 0; i < PHYSICAL_NAND_NUM; i++)
     {
@@ -284,14 +285,16 @@ static unsigned int gc()
 
                 if (pca.fields.page >= (NAND_SIZE_KB * (1024 / 512)))
                 {
-                    reserve_nand = i;
-                    pca.fields.block = i;
+                    reserve_nand = pre_clear_block;
+                    pca.fields.block = pre_clear_block;
                     pca.fields.page = 0;
                 }
             }
             info_table[i][j] = CLEAR;
         }
+        print_info_table();
         nand_erase(i);
+        pre_clear_block = i;
         free_block_list[i] = 0;
     }
 
@@ -491,7 +494,7 @@ static int ssd_do_write(const char *buf, size_t size, off_t offset)
         if (offset % 512 == 0)
         {
             printf(">>>>> ssd_do_write Case 1\n");
-            if (!ftl_read(alignBuf, tmp_lba)) // LBA space is clear
+            if (!ftl_read(alignBuf, tmp_lba + idx)) // LBA space is clear
             {
                 rst = ftl_write(buf + process_size, 1, tmp_lba + idx);
             }
