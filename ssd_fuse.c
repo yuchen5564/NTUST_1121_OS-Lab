@@ -230,6 +230,10 @@ static unsigned int get_next_pca()
 
 static unsigned int gc()
 {
+    for(int i = 0;i<PHYSICAL_NAND_NUM;i++){
+        printf("%2d ", free_block_list[i]);
+    }
+    printf("\n");
     int invaild_page_num[PHYSICAL_NAND_NUM] = {[0 ... PHYSICAL_NAND_NUM - 1] = 0};
     // int max_invaild_nand = -1;
     for (int i = 0; i < PHYSICAL_NAND_NUM; i++)
@@ -293,11 +297,21 @@ static unsigned int gc()
 
     for (int i = 0; i < PHYSICAL_NAND_NUM; i++)
     {
-        if (info_table[i][0] == CLEAR)
+        if (info_table[i][0] == CLEAR){
             reserve_nand = i;
+            break;
+        }
+            
     }
     printf(">>>>> reserve_nand: %d\n", reserve_nand);
     print_info_table();
+    for(int i = 0;i<PHYSICAL_NAND_NUM;i++){
+        if(info_table[i][19] != -1) free_block_list[i] = -1;
+    }
+    for(int i = 0;i<PHYSICAL_NAND_NUM;i++){
+        printf("%2d ", free_block_list[i]);
+    }
+    printf("\n");
     return pca.pca;
 }
 
@@ -336,7 +350,6 @@ static int ftl_write(const char *buf, size_t lba_rnage, size_t lba)
     {
         L2P[lba] = pca.pca;
         info_table[pca.fields.block][pca.fields.page] = lba;
-        print_info_table();
         return 512;
     }
     else
@@ -543,7 +556,7 @@ static int ssd_do_write(const char *buf, size_t size, off_t offset)
             return -EINVAL;
         }
     }
-
+    print_info_table();
     return size;
 }
 
