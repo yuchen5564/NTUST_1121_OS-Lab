@@ -470,8 +470,8 @@ static int ssd_do_write(const char *buf, size_t size, off_t offset)
     tmp_lba_range = (offset + size - 1) / 512 - (tmp_lba) + 1;
     process_size = 0;
     remain_size = size;
-    if (*(buf + remain_size - 1) == '\n')
-        remain_size--;
+    // if (*(buf + remain_size - 1) == '\n')
+    //     remain_size--;
     curr_size = 0;
 
     // consider case:
